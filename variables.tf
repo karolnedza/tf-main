@@ -6,6 +6,8 @@ variable "name" {default = "placeholder"}
 
 variable "global_region" {}
 
+variable "vpc_cidr" {}
+
 variable "ctrl_password" {}
 
 variable "ctrl_ip" {}

@@ -163,12 +163,12 @@ module "admin_vpc_gwha_subnet_rt_assoc" {
 # }
 # #
 # #### ------- Security group ------- ####
-module "admin_vpc_sample_sg" {
-  source = "git::https://github.com/karolnedza/terraform-aws-security-group.git?ref=v1.0.0"
-  sg_name = "${var.name}-rt-public"
-  sg_description = "${var.name}-rt-public"
-  sg_vpc_id = module.admin_vpc.vpc_id
-}
+# module "admin_vpc_sample_sg" {
+#   source = "git::https://github.com/karolnedza/terraform-aws-security-group.git?ref=v1.0.0"
+#   sg_name = "${var.name}-rt-public"
+#   sg_description = "${var.name}-rt-public"
+#   sg_vpc_id = module.admin_vpc.vpc_id
+# }
 
 
 # #### ------- Security group sample rule : allow ssh from SAP range ------- ####
@@ -185,15 +185,25 @@ module "admin_vpc_sample_sg" {
 
 ##### ------- Aviatrix Spoke GW ------- ####
 
-module "admin_avx_spoke_sample_sg" {
-  source = "git::https://github.com/karolnedza/terraform-aws-aviatrix-spoke.git?ref=v1.0.0"
+# module "admin_avx_spoke_sample_sg" {
+#   source = "git::https://github.com/karolnedza/terraform-aws-aviatrix-spoke.git?ref=v1.0.0"
   
-  vpc_id = module.admin_vpc.vpc_id
-  subnet_gw = module.admin_vpc_gw_subnet.subnet_cidr_block
-  name = "${var.name}-gateway"
-  account = aviatrix_account.avx_acc_aws.account_name
-  region = var.global_region
-  ha_gw = false
-#  transit_gw = "av-transit-eu-central-1"
-#  security_domain = "red"
+#   vpc_id = module.admin_vpc.vpc_id
+#   subnet_gw = local.subnet
+#   name = "${var.name}-gateway"
+#   account = aviatrix_account.avx_acc_aws.account_name
+#   region = var.global_region
+#   ha_gw = false
+# #  transit_gw = "av-transit-eu-central-1"
+# #  security_domain = "red"
+# }
+
+
+
+locals {
+  cidrbits          = tonumber(split("/", var.vpc_cidr)[1])
+  newbits           = 26 - local.cidrbits
+  netnum            = pow(2, local.newbits)
+  subnet            = var.insane_mode ? cidrsubnet(var.cidr, local.newbits, local.netnum - 2) : cidrsubnet(var.cidr, local.newbits, local.netnum - 2)
+  ha_subnet         = var.insane_mode ? cidrsubnet(var.cidr, local.newbits, local.netnum - 1) : cidrsubnet(var.cidr, local.newbits, local.netnum - 1)
 }
