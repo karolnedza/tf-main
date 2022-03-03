@@ -56,7 +56,7 @@ module "admin_vpc" {
 module "admin_igw" {
   source = "git::https://github.com/karolnedza/terraform-aws-igw.git?ref=v1.0.0"
   igw_vpc = module.admin_vpc.vpc_id
-  name = "test"
+  name = var.name
  #
 }
 
