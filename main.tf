@@ -10,7 +10,6 @@ provider "aviatrix" {
   username                = "admin"
   password                = var.ctrl_password
   controller_ip           = var.ctrl_ip
-  skip_version_validation = false
 }
 
 terraform {
@@ -22,7 +21,14 @@ terraform {
   }
 }
 
+##### Data resources
+# AWS Account ID
 data "aws_caller_identity" "current" {}
+
+#### available azs ####
+data "aws_availability_zones" "available" {
+  state = "available"
+}
 
 resource "aviatrix_account" "avx_acc_aws" {  # Should this be Module ?
   account_name       = "test"
@@ -33,17 +39,13 @@ resource "aviatrix_account" "avx_acc_aws" {  # Should this be Module ?
   aws_secret_key     = var.aws_secret_access_key
 }
 
-#### available azs ####
-data "aws_availability_zones" "available" {
-  state = "available"
-}
 
 #### Admin VPC ###
 
 #### ------- VPC ------- ####
 module "admin_vpc" {
   source = "git::https://github.com/karolnedza/terraform-aws-vpc.git?ref=v1.0.0"
-  vpc_cidr = "10.30.0.0/16"
+  vpc_cidr = var.cidr
   vpc_name = "${var.name}-vpc"
   vpc_security_zone = "security-zone-1"
 }
@@ -64,7 +66,7 @@ module "admin_igw" {
 module "admin_vpc_sample_subnet" {
   source = "git::https://github.com/karolnedza/terraform-aws-subnet.git?ref=v1.0.0"
   subnet_vpc = module.admin_vpc.vpc_id
-  subnet_cidr_block = "10.30.1.0/24"
+  subnet_cidr_block = local.vm_subnet
   subnet_name = "${var.name}-subnet"
   subnet_az = data.aws_availability_zones.available.names[0]
 }
@@ -72,8 +74,9 @@ module "admin_vpc_sample_subnet" {
 # #### ------- Subnet GW ------- ####
 module "admin_vpc_gw_subnet" {
   source = "git::https://github.com/karolnedza/terraform-aws-subnet.git?ref=v1.0.0"
+  count = var.insane_mode ? 0 : 1
   subnet_vpc = module.admin_vpc.vpc_id
-  subnet_cidr_block = "10.30.0.0/28"
+  subnet_cidr_block = local.gw_subnet
   subnet_name = "${var.name}-subnet-gw"
   subnet_az = data.aws_availability_zones.available.names[0]
 }
@@ -81,11 +84,13 @@ module "admin_vpc_gw_subnet" {
 # #### ------- Subnet GW-HAGW ------- ####
 module "admin_vpc_gwha_subnet" {
   source = "git::https://github.com/karolnedza/terraform-aws-subnet.git?ref=v1.0.0"
+  count = var.insane_mode ? 0 : 1
   subnet_vpc = module.admin_vpc.vpc_id
-  subnet_cidr_block = "10.30.0.16/28"
+  subnet_cidr_block = local.gwha_subnet
   subnet_name = "${var.name}-subnet-hagw"
   subnet_az = data.aws_availability_zones.available.names[1]
 }
+
 
 # #### ------- Private Route table workloads------- ####
 module "admin_vpc_subnet1_rt"{
@@ -115,14 +120,16 @@ module "admin_vpc_subnet1_rt_assoc" {
 
 module "admin_vpc_gw_subnet_rt_assoc" {
   source = "git::https://github.com/karolnedza/terraform-aws-rt-association.git?ref=v1.0.0"
-  subnet_id = module.admin_vpc_gw_subnet.subnet_id
+  count = var.insane_mode ? 0 : 1
+  subnet_id = module.admin_vpc_gw_subnet[0].subnet_id
   route_table_id = module.admin_vpc_subnet_gw_rt.route_table_id
 }
 
 
 module "admin_vpc_gwha_subnet_rt_assoc" {
   source = "git::https://github.com/karolnedza/terraform-aws-rt-association.git?ref=v1.0.0"
-  subnet_id = module.admin_vpc_gw_subnet.subnet_id
+  count = var.insane_mode ? 0 : 1
+  subnet_id = module.admin_vpc_gwha_subnet[0].subnet_id
   route_table_id = module.admin_vpc_subnet_gw_rt.route_table_id
 }
 
@@ -135,8 +142,8 @@ module "admin_vpc_gwha_subnet_rt_assoc" {
 #   nacl_subnet_ids = [module.admin_vpc_sample_subnet.subnet_id]
 # }
 
-# # #
-#### ------- NACL rule : allow ssh inbound from SAP range ------- ####
+# #
+### ------- NACL rule : allow ssh inbound from SAP range ------- ####
 # module "admin_vpc_subnet1_nacl_allow_https_in" {
 #   source = "../modules/nacl-add-rule"
 #   nacl_id = module.admin_vpc_subnet1_nacl.nacl_id
@@ -171,7 +178,7 @@ module "admin_vpc_gwha_subnet_rt_assoc" {
 # }
 
 
-# #### ------- Security group sample rule : allow ssh from SAP range ------- ####
+# # #### ------- Security group sample rule : allow ssh from SAP range ------- ####
 # module "admin_vpc_sample_sg_allow_https" {
 #   source = "./terraform-security-group-rule"
 #   rule_description = "allow-https"
@@ -185,25 +192,16 @@ module "admin_vpc_gwha_subnet_rt_assoc" {
 
 ##### ------- Aviatrix Spoke GW ------- ####
 
-# module "admin_avx_spoke_sample_sg" {
-#   source = "git::https://github.com/karolnedza/terraform-aws-aviatrix-spoke.git?ref=v1.0.0"
-  
-#   vpc_id = module.admin_vpc.vpc_id
-#   subnet_gw = local.subnet
-#   name = "${var.name}-gateway"
-#   account = aviatrix_account.avx_acc_aws.account_name
-#   region = var.global_region
-#   ha_gw = false
-# #  transit_gw = "av-transit-eu-central-1"
-# #  security_domain = "red"
-# }
-
-
-
-locals {
-  cidrbits          = tonumber(split("/", var.vpc_cidr)[1])
-  newbits           = 26 - local.cidrbits
-  netnum            = pow(2, local.newbits)
-  subnet            = var.insane_mode ? cidrsubnet(var.cidr, local.newbits, local.netnum - 2) : cidrsubnet(var.cidr, local.newbits, local.netnum - 2)
-  ha_subnet         = var.insane_mode ? cidrsubnet(var.cidr, local.newbits, local.netnum - 1) : cidrsubnet(var.cidr, local.newbits, local.netnum - 1)
+module "admin_avx_spoke_sample_sg" {
+  source = "git::https://github.com/karolnedza/terraform-aws-aviatrix-spoke.git?ref=v1.0.1"
+  vpc_id = module.admin_vpc.vpc_id
+  subnet_gw = var.insane_mode ? local.gw_subnet : module.admin_vpc_gw_subnet[0].subnet_cidr_block
+  subnet_gwha = var.ha_enabled ? (var.insane_mode ? local.gwha_subnet : module.admin_vpc_gwha_subnet[0].subnet_cidr_block) : null
+  name = var.name
+  account = aviatrix_account.avx_acc_aws.account_name
+  region = var.global_region
+  ha_gw = var.ha_enabled
+  insane_mode = var.insane_mode
+#  transit_gw = "av-transit-eu-central-1"
+#  security_domain = "red"
 }
