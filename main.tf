@@ -205,3 +205,8 @@ module "admin_avx_spoke_sample_sg" {
 #  transit_gw = "av-transit-eu-central-1"
 #  security_domain = "red"
 }
+
+
+output "subnet_cidr" {
+  value = module.admin_vpc_sample_subnet.subnet_cidr_block
+}
