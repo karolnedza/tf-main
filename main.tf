@@ -48,12 +48,14 @@ module "admin_vpc" {
   vpc_security_zone = "security-zone-1"
 }
 
+
 #### ------- IGW ------- ####
 
 module "admin_igw" {
   source = "git::https://github.com/karolnedza/terraform-aws-igw.git?ref=v1.0.0"
   igw_vpc = module.admin_vpc.vpc_id
-  name = "test-igw"
+  name = "test"
+ #
 }
 
 # #
@@ -134,7 +136,7 @@ module "admin_vpc_gwha_subnet_rt_assoc" {
 # }
 
 # # #
-# #### ------- NACL rule : allow ssh inbound from SAP range ------- ####
+#### ------- NACL rule : allow ssh inbound from SAP range ------- ####
 # module "admin_vpc_subnet1_nacl_allow_https_in" {
 #   source = "../modules/nacl-add-rule"
 #   nacl_id = module.admin_vpc_subnet1_nacl.nacl_id
@@ -185,6 +187,7 @@ module "admin_vpc_sample_sg" {
 
 module "admin_avx_spoke_sample_sg" {
   source = "git::https://github.com/karolnedza/terraform-aws-aviatrix-spoke.git?ref=v1.0.0"
+  
   vpc_id = module.admin_vpc.vpc_id
   subnet_gw = module.admin_vpc_gw_subnet.subnet_cidr_block
   name = "${var.name}-gateway"
