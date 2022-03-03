@@ -1,7 +1,0 @@
-terraform.tfvars.json_
-terraform.tfvars.json
-.gitignore
-.terraform.lock.hcl
-.terraform/
-terraform.tfstate
-terraform.tfstate.backup
