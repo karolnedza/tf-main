@@ -31,7 +31,7 @@ data "aws_availability_zones" "available" {
 }
 
 resource "aviatrix_account" "avx_acc_aws" {  # Should this be Module ?
-  account_name       = "test"
+  account_name       = var.name
   cloud_type         = 1
   aws_iam            = false
   aws_account_number = data.aws_caller_identity.current.account_id
